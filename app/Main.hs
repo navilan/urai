@@ -1,7 +1,9 @@
 module Main (main) where
 
-import Urai (someFunc)
+import Urai (printDhall)
+
+import qualified Data.Text.IO as TIO
 
 
 main :: IO ()
-main = someFunc
+main = TIO.writeFile "./TwitterCard.dhall" printDhall

@@ -7,9 +7,8 @@ A static website generator with focus on structured writing
 -}
 
 module Urai
-       ( someFunc
-       ) where
+       ( printDhall
+       )
+where
 
-
-someFunc :: IO ()
-someFunc = putStrLn ("someFunc" :: String)
+import           Urai.Config.ConfigWriter       ( printDhall )
