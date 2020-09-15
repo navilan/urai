@@ -16,7 +16,6 @@ module Urai.Config.TwitterCard
 where
 
 import qualified Data.Text                     as T
-import qualified Data.Tuple.Extra              as TE
 import           Dhall                          ( Encoder(..)
                                                 , FromDhall(..)
                                                 , ToDhall(..)
@@ -24,31 +23,19 @@ import           Dhall                          ( Encoder(..)
                                                 , autoWith
                                                 , constructor
                                                 , encodeConstructorWith
-                                                , encodeFieldWith
                                                 , inject
-                                                , recordEncoder
                                                 , union
                                                 , unionEncoder
-                                                , (>*<)
                                                 , (>|<)
-                                                )
-import           Dhall.Core                     ( Binding
-                                                , Expr(..)
-                                                , makeBinding
-                                                , makeRecordField
-                                                , pretty
-                                                , variable
-                                                , wrapInLets
                                                 )
 import           Dhall.Deriving                 ( type (<<<)
                                                 , CamelCase
+                                                , Codec(..)
                                                 , DropPrefix
                                                 , Field
                                                 )
-import qualified Dhall.Map                     as DM
-import           Dhall.Src                      ( Src )
 
-import           Urai.Config.Deriving
+import           Urai.Config.Module
 
 
 data TwitterInfo = TwitterInfo
@@ -60,8 +47,7 @@ data TwitterInfo = TwitterInfo
     , twitterInfoImageAlt    :: T.Text
     }
     deriving stock Generic
-    deriving (FromDhall, ToDhall, LetBound) via MultiLetBound
-        (LetBinding "TwitterInfo")
+    deriving (FromDhall, ToDhall) via Codec
         (Field (CamelCase <<< DropPrefix "twitterInfo"))
         TwitterInfo
 
@@ -70,38 +56,18 @@ newtype TwitterSummaryCard = TwitterSummaryCard
     { twitterSummary :: TwitterInfo
     }
     deriving stock Generic
-    deriving (FromDhall, LetBound) via MultiLetBound
-        (LetBinding "TwitterSummaryCard")
+    deriving (FromDhall, ToDhall) via Codec
         (Field (CamelCase <<< DropPrefix "twitter"))
         TwitterSummaryCard
-
-
-injectTwitterSummaryCard :: Encoder TwitterSummaryCard
-injectTwitterSummaryCard = recordEncoder $ contramap
-    (\(TwitterSummaryCard i) -> i)
-    (encodeFieldWith "summary" (typeEncoder @TwitterInfo))
-
-
-instance ToDhall TwitterSummaryCard where
-    injectWith _ = injectTwitterSummaryCard
 
 
 newtype TwitterLargeCard = TwitterLargeCard
     { twitterLarge :: TwitterInfo
     }
     deriving stock Generic
-    deriving (FromDhall, LetBound) via MultiLetBound
-        (LetBinding "TwitterLargeCard")
+    deriving (FromDhall, ToDhall) via Codec
         (Field (CamelCase <<< DropPrefix "twitter"))
         TwitterLargeCard
-
-injectTwitterLargeCard :: Encoder TwitterLargeCard
-injectTwitterLargeCard = recordEncoder $ contramap
-    (\(TwitterLargeCard i) -> i)
-    (encodeFieldWith "large" (typeEncoder @TwitterInfo))
-
-instance ToDhall TwitterLargeCard where
-    injectWith _ = injectTwitterLargeCard
 
 data TwitterAppInfo = TwitterAppInfo
     { twitterAppName :: T.Text
@@ -109,8 +75,7 @@ data TwitterAppInfo = TwitterAppInfo
     , twitterAppUrl  :: T.Text
     }
     deriving stock Generic
-    deriving (FromDhall, ToDhall, LetBound) via MultiLetBound
-        (LetBinding "TwitterAppInfo")
+    deriving (FromDhall, ToDhall) via Codec
         (Field (CamelCase <<< DropPrefix "twitterApp"))
         TwitterAppInfo
 
@@ -122,24 +87,9 @@ data TwitterAppCard = TwitterAppCard
     , twitterAppAndroid :: Maybe TwitterAppInfo
     }
     deriving stock Generic
-    deriving (FromDhall, LetBound) via MultiLetBound
-        (LetBinding "TwitterAppCard")
+    deriving (FromDhall, ToDhall) via Codec
         (Field (CamelCase <<< DropPrefix "twitterApp"))
         TwitterAppCard
-
-
-injectTwitterAppCard :: Encoder TwitterAppCard
-injectTwitterAppCard = recordEncoder $ contramap
-    (\(TwitterAppCard i c p pd a) -> (i, (c, (p, (pd, a)))))
-    (   encodeFieldWith "info"    (typeEncoder @TwitterInfo)
-    >*< encodeFieldWith "country" (typeEncoder @T.Text)
-    >*< encodeFieldWith "iPhone"  (optionalTypeEncoder @TwitterAppInfo)
-    >*< encodeFieldWith "iPad"    (optionalTypeEncoder @TwitterAppInfo)
-    >*< encodeFieldWith "android" (optionalTypeEncoder @TwitterAppInfo)
-    )
-
-instance ToDhall TwitterAppCard where
-    injectWith _ = injectTwitterAppCard
 
 data TwitterPlayerCard = TwitterPlayerCard
     { twitterPlayerInfo      :: TwitterInfo
@@ -148,23 +98,10 @@ data TwitterPlayerCard = TwitterPlayerCard
     , twitterPlayerHeight    :: Integer
     }
     deriving stock Generic
-    deriving (FromDhall, LetBound) via MultiLetBound
-        (LetBinding "TwitterPlayerCard")
+    deriving (FromDhall, ToDhall) via Codec
         (Field (CamelCase <<< DropPrefix "twitterPlayer"))
         TwitterPlayerCard
 
-
-injectTwitterPlayerCard :: Encoder TwitterPlayerCard
-injectTwitterPlayerCard = recordEncoder $ contramap
-    (\(TwitterPlayerCard i p w h) -> (i, (p, (w, h))))
-    (   encodeFieldWith "info"   (typeEncoder @TwitterInfo)
-    >*< encodeFieldWith "url"    (typeEncoder @T.Text)
-    >*< encodeFieldWith "width"  (typeEncoder @Integer)
-    >*< encodeFieldWith "height" (typeEncoder @Integer)
-    )
-
-instance ToDhall TwitterPlayerCard where
-    injectWith _ = injectTwitterPlayerCard
 
 data TwitterCard
   = SummaryCard TwitterSummaryCard
@@ -186,10 +123,10 @@ instance FromDhall TwitterCard where
 
 injectTwitterCard :: Encoder TwitterCard
 injectTwitterCard = adapt >$< unionEncoder
-    (   encodeConstructorWith "Summary" (typeEncoder @TwitterSummaryCard)
-    >|< encodeConstructorWith "Large"   (typeEncoder @TwitterLargeCard)
-    >|< encodeConstructorWith "App"     (typeEncoder @TwitterAppCard)
-    >|< encodeConstructorWith "Player"  (typeEncoder @TwitterPlayerCard)
+    (   encodeConstructorWith "Summary" (inject @TwitterSummaryCard)
+    >|< encodeConstructorWith "Large"   (inject @TwitterLargeCard)
+    >|< encodeConstructorWith "App"     (inject @TwitterAppCard)
+    >|< encodeConstructorWith "Player"  (inject @TwitterPlayerCard)
     )
   where
     adapt (SummaryCard x) = Left x
@@ -201,22 +138,19 @@ instance ToDhall TwitterCard where
     injectWith _ = injectTwitterCard
 
 
-bindings :: [Binding Src Void]
-bindings =
-    [ makeBinding "TwitterInfo"        (declared (inject @TwitterInfo))
-    , makeBinding "TwitterSummaryCard" (declared (inject @TwitterSummaryCard))
-    , makeBinding "TwitterLargeCard"   (declared (inject @TwitterLargeCard))
-    , makeBinding "TwitterAppInfo"     (declared (inject @TwitterAppInfo))
-    , makeBinding "TwitterAppCard"     (declared (inject @TwitterAppCard))
-    , makeBinding "TwitterPlayerCard"  (declared (inject @TwitterPlayerCard))
-    , makeBinding "TwitterCard"        (declared (inject @TwitterCard))
-    ]
+declareModule :: Module()
+declareModule = do
+    addBinding "TwitterInfo"        (declared (inject @TwitterInfo))
+    addBinding "TwitterSummaryCard" (declared (inject @TwitterSummaryCard))
+    addBinding "TwitterLargeCard"   (declared (inject @TwitterLargeCard))
+    addBinding "TwitterAppInfo"     (declared (inject @TwitterAppInfo))
+    addBinding "TwitterAppCard"     (declared (inject @TwitterAppCard))
+    addBinding "TwitterPlayerCard"  (declared (inject @TwitterPlayerCard))
+    addBinding "TwitterCard"        (declared (inject @TwitterCard))
 
 
-expression :: [Binding Src a] -> Expr Src a
-expression bs = RecordLit . DM.fromList $ map
-    (variable TE.&&& (makeRecordField . Var . fromString . T.unpack . variable))
-    bs
 
-printDhall :: T.Text
-printDhall = pretty $ wrapInLets bindings (expression bindings)
+printDhall :: Module Text
+printDhall = do
+  declareModule
+  evalModule

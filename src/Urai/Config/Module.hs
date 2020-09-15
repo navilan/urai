@@ -108,22 +108,24 @@ addBinding t x = modify (<> (pure $ makeModuleBinding t x))
 
 
 findBinding
-    :: ExpressionMeta Void
-    -> [ModuleBinding Void]
-    -> Maybe (Expr Src Void)
+    :: ExpressionMeta Void -> [ModuleBinding Void] -> Maybe (Expr Src Void)
 findBinding meta =
     fmap boundVar . listToMaybe . filter (\b -> (rawExp b) == meta)
 
 
-rewriteExpression
-    :: Expr Src Void -> [ModuleBinding Void] -> Expr Src Void
-rewriteExpression e@(Record _) = fromMaybe e . findBinding (makeMeta e)
-rewriteExpression e            = const e
+
+findBoundExpression :: Expr Src Void -> [ModuleBinding Void] -> Expr Src Void
+findBoundExpression e = fromMaybe e . findBinding (makeMeta e)
+
+
+rewriteExpression :: Expr Src Void -> [ModuleBinding Void] -> Expr Src Void
+rewriteExpression e@(Record _      ) = findBoundExpression e
+rewriteExpression (  App List     e) = App List . findBoundExpression e
+rewriteExpression (  App Optional e) = App Optional . findBoundExpression e
+rewriteExpression e                  = const e
 
 rewriteRecordField
-    :: RecordField Src Void
-    -> [ModuleBinding Void]
-    -> RecordField Src Void
+    :: RecordField Src Void -> [ModuleBinding Void] -> RecordField Src Void
 rewriteRecordField r@(RecordField {..}) bs =
     r { recordFieldValue = rewriteExpression recordFieldValue bs }
 
@@ -139,6 +141,7 @@ rewriteBinding m bs = case asSubstExpr m of
                          (fmap $ flip rewriteExpression bs)
                          ms
         }
+
     _ -> m
 
 

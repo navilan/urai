@@ -63,12 +63,10 @@ library
   hs-source-dirs:      src
   exposed-modules:     Urai
                        Urai.Config.ConfigWriter
-                       Urai.Config.Deriving
                        Urai.Config.Meta
                        Urai.Config.Module
                        Urai.Config.TwitterCard
                        Urai.Config.OpenGraph
-                       Urai.Config.Util
   build-depends:       text               ^>= 1.2.3.0,
                        shake              ^>= 0.19.1,
                        dhall              ^>= 1.34.0,

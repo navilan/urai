@@ -1,3 +1,7 @@
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DerivingVia                #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeOperators              #-}
 -- | Generic metadata for a website
 
 module Urai.Config.Meta
@@ -5,29 +9,37 @@ module Urai.Config.Meta
     )
 where
 
-import qualified Data.Text                     as T
-import           Dhall                          ( auto
-                                                , Decoder
-                                                , ExpectedTypeErrors
+import           Dhall                          ( Encoder(..)
                                                 , FromDhall(..)
-                                                , expected
-                                                , genericAutoWith
+                                                , ToDhall(..)
+                                                , inject
                                                 )
-import qualified Urai.Config.Util              as U
+
+import           Dhall.Deriving                 ( type (<<<)
+                                                , CamelCase
+                                                , Codec(..)
+                                                , DropPrefix
+                                                , Field
+                                                )
+
+import           Urai.Config.Module
 
 data Meta = Meta
-    { metaDescription :: T.Text
-    , metaAuthor      :: T.Text
-    , metaTitle       :: T.Text
+    { metaDescription :: Text
+    , metaAuthor      :: Text
+    , metaTitle       :: Text
     }
     deriving stock Generic
+    deriving (FromDhall, ToDhall) via Codec
+        (Field (CamelCase <<< DropPrefix "meta"))
+        Meta
 
-instance FromDhall Meta where
-    autoWith _ = genericAutoWith (U.dropPrefix "meta")
 
+declareModule :: Module ()
+declareModule = do
+    addBinding "Meta" (declared (inject @Meta))
 
-metaDecoder :: Decoder Meta
-metaDecoder = auto
-
-printDhall :: Either ExpectedTypeErrors T.Text
-printDhall = U.printDhall (expected metaDecoder)
+printDhall :: Module Text
+printDhall = do
+    declareModule
+    evalModule

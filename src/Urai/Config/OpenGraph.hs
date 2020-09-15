@@ -80,7 +80,7 @@ data OpenGraphMediaInfo = OpenGraphMediaInfo
 
 
 data OpenGraphVisualMedia = OpenGraphVisualMedia
-    { ogVisualInfo   :: OpenGraphMediaInfo
+    { ogVisualMedia  :: OpenGraphMediaInfo
     , ogVisualWidth  :: Integer
     , ogVisualHeight :: Integer
     }
@@ -91,7 +91,7 @@ data OpenGraphVisualMedia = OpenGraphVisualMedia
 
 
 newtype OpenGraphAudio = OpenGraphAudio
-    { ogAudioInfo :: OpenGraphMediaInfo
+    { ogAudioMedia :: OpenGraphMediaInfo
     }
     deriving stock Generic
     deriving (FromDhall, ToDhall) via Codec
@@ -99,8 +99,8 @@ newtype OpenGraphAudio = OpenGraphAudio
     OpenGraphAudio
 
 data OpenGraphImage = OpenGraphImage
-    { ogImageInfo :: OpenGraphVisualMedia
-    , ogImageAlt  :: T.Text
+    { ogImageVisual :: OpenGraphVisualMedia
+    , ogImageAlt    :: T.Text
     }
     deriving stock Generic
     deriving (FromDhall, ToDhall) via Codec
@@ -109,7 +109,7 @@ data OpenGraphImage = OpenGraphImage
 
 
 newtype OpenGraphVideo = OpenGraphVideo
-    { ogVideoInfo :: OpenGraphVisualMedia
+    { ogVideoVisual :: OpenGraphVisualMedia
     }
     deriving stock Generic
     deriving (FromDhall, ToDhall) via Codec
@@ -219,8 +219,9 @@ injectOpenGraph = adapt >$< unionEncoder
 instance ToDhall OpenGraph where
     injectWith _ = injectOpenGraph
 
-printDhall :: Module Text
-printDhall = do
+
+declareModule :: Module ()
+declareModule = do
     addBinding "OpenGraphSite"        (declared (inject @OpenGraphSite))
     addBinding "OpenGraphBasic"       (declared (inject @OpenGraphBasic))
     addBinding "OpenGraphMediaInfo"   (declared (inject @OpenGraphMediaInfo))
@@ -229,8 +230,12 @@ printDhall = do
     addBinding "OpenGraphImage"       (declared (inject @OpenGraphImage))
     addBinding "OpenGraphVideo"       (declared (inject @OpenGraphVideo))
     addBinding "OpenGraphProfile"     (declared (inject @OpenGraphProfile))
+    addBinding "OpenGraphProfileItem" (declared (inject @OpenGraphProfileItem))
     addBinding "OpenGraphWebsite"     (declared (inject @OpenGraphWebsite))
     addBinding "OpenGraphArticle"     (declared (inject @OpenGraphArticle))
-    addBinding "OpenGraphProfileItem" (declared (inject @OpenGraphProfileItem))
     addBinding "OpenGraph"            (declared (inject @OpenGraph))
+
+printDhall :: Module Text
+printDhall = do
+    declareModule
     evalModule
