@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeOperators              #-}
 
@@ -42,9 +41,9 @@ import           Dhall.Core                     ( Binding
                                                 , wrapInLets
                                                 )
 import           Dhall.Deriving                 ( type (<<<)
-                                                , Field
                                                 , CamelCase
                                                 , DropPrefix
+                                                , Field
                                                 )
 import qualified Dhall.Map                     as DM
 import           Dhall.Src                      ( Src )
@@ -61,14 +60,13 @@ data TwitterInfo = TwitterInfo
     , twitterInfoImageAlt    :: T.Text
     }
     deriving stock Generic
-    deriving (FromDhall, ToDhall, LetBound)
-      via MultiLetBound
-            (LetBinding "TwitterInfo")
-            (Field (CamelCase <<< DropPrefix "twitterInfo"))
-            TwitterInfo
+    deriving (FromDhall, ToDhall, LetBound) via MultiLetBound
+        (LetBinding "TwitterInfo")
+        (Field (CamelCase <<< DropPrefix "twitterInfo"))
+        TwitterInfo
 
 
-data TwitterSummaryCard = TwitterSummaryCard
+newtype TwitterSummaryCard = TwitterSummaryCard
     { twitterSummary :: TwitterInfo
     }
     deriving stock Generic
@@ -88,7 +86,7 @@ instance ToDhall TwitterSummaryCard where
     injectWith _ = injectTwitterSummaryCard
 
 
-data TwitterLargeCard = TwitterLargeCard
+newtype TwitterLargeCard = TwitterLargeCard
     { twitterLarge :: TwitterInfo
     }
     deriving stock Generic
@@ -133,15 +131,15 @@ data TwitterAppCard = TwitterAppCard
 injectTwitterAppCard :: Encoder TwitterAppCard
 injectTwitterAppCard = recordEncoder $ contramap
     (\(TwitterAppCard i c p pd a) -> (i, (c, (p, (pd, a)))))
-    (   encodeFieldWith "info" (typeEncoder @TwitterInfo)
+    (   encodeFieldWith "info"    (typeEncoder @TwitterInfo)
     >*< encodeFieldWith "country" (typeEncoder @T.Text)
-    >*< encodeFieldWith "iPhone" (optionalTypeEncoder @TwitterAppInfo)
-    >*< encodeFieldWith "iPad" (optionalTypeEncoder @TwitterAppInfo)
+    >*< encodeFieldWith "iPhone"  (optionalTypeEncoder @TwitterAppInfo)
+    >*< encodeFieldWith "iPad"    (optionalTypeEncoder @TwitterAppInfo)
     >*< encodeFieldWith "android" (optionalTypeEncoder @TwitterAppInfo)
     )
 
 instance ToDhall TwitterAppCard where
-  injectWith _ = injectTwitterAppCard
+    injectWith _ = injectTwitterAppCard
 
 data TwitterPlayerCard = TwitterPlayerCard
     { twitterPlayerInfo      :: TwitterInfo
@@ -159,14 +157,14 @@ data TwitterPlayerCard = TwitterPlayerCard
 injectTwitterPlayerCard :: Encoder TwitterPlayerCard
 injectTwitterPlayerCard = recordEncoder $ contramap
     (\(TwitterPlayerCard i p w h) -> (i, (p, (w, h))))
-    (   encodeFieldWith "info" (typeEncoder @TwitterInfo)
-    >*< encodeFieldWith "url" (typeEncoder @T.Text)
-    >*< encodeFieldWith "width" (typeEncoder @Integer)
+    (   encodeFieldWith "info"   (typeEncoder @TwitterInfo)
+    >*< encodeFieldWith "url"    (typeEncoder @T.Text)
+    >*< encodeFieldWith "width"  (typeEncoder @Integer)
     >*< encodeFieldWith "height" (typeEncoder @Integer)
     )
 
 instance ToDhall TwitterPlayerCard where
-  injectWith _ = injectTwitterPlayerCard
+    injectWith _ = injectTwitterPlayerCard
 
 data TwitterCard
   = SummaryCard TwitterSummaryCard
@@ -221,4 +219,4 @@ expression bs = RecordLit . DM.fromList $ map
     bs
 
 printDhall :: T.Text
-printDhall =  pretty $ wrapInLets bindings (expression bindings)
+printDhall = pretty $ wrapInLets bindings (expression bindings)

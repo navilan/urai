@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE TypeApplications #-}
 -- | Generic metadata for a website
 
 module Urai.Config.Meta

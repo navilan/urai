@@ -53,7 +53,7 @@ instance ( Generic a
     injectWith _ = unMultiLetBound >$< genericToDhallWith (modifyOptions @m defaultInterpretOptions)
 
 instance ( NamedBinding b ) => NamedBinding (MultiLetBound m b a) where
-  bindingName = (bindingName @b)
+  bindingName = bindingName @b
 
 
 

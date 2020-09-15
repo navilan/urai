@@ -65,7 +65,9 @@ library
                        Urai.Config.ConfigWriter
                        Urai.Config.Deriving
                        Urai.Config.Meta
+                       Urai.Config.Module
                        Urai.Config.TwitterCard
+                       Urai.Config.OpenGraph
                        Urai.Config.Util
   build-depends:       text               ^>= 1.2.3.0,
                        shake              ^>= 0.19.1,
@@ -73,6 +75,7 @@ library
                        either             ^>= 5.0.1.1,
                        extra              ^>= 1.7.4,
                        pandoc             ^>= 2.10.1,
+                       prettyprinter      ^>= 1.7.0,
                        filepattern        ^>= 0.1.2,
                        text-manipulate    ^>= 0.2.0.1,
                        containers         ^>= 0.6.2.1,
