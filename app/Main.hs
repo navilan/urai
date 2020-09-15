@@ -1,7 +1,6 @@
 module Main (main) where
 
-import Urai (someFunc)
-
+import Urai (printDhall)
 
 main :: IO ()
-main = someFunc
+main = printDhall "."
