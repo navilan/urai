@@ -45,8 +45,8 @@ data ExpressionMeta a = ExpressionMeta
 
 instance (Eq a, Pretty a, Show a) => Eq (ExpressionMeta a) where
     exp1 == exp2 =
-        ((expanse exp1) == (expanse exp2))
-            && (same $ diffNormalized (expression exp1) (expression exp2))
+        (expanse exp1 == expanse exp2)
+            && same (diffNormalized (expression exp1) (expression exp2))
 
 
 data ModuleBinding a = ModuleBinding
@@ -57,7 +57,7 @@ data ModuleBinding a = ModuleBinding
 
 
 asSubstExpr :: ModuleBinding a -> Expr Src a
-asSubstExpr (ModuleBinding { substExp = ExpressionMeta {..} }) = expression
+asSubstExpr ModuleBinding { substExp = ExpressionMeta {..} } = expression
 
 
 boundVar :: ModuleBinding a -> Expr Src a
@@ -69,8 +69,8 @@ calculateExpanse' = unfoldTree expand
   where
 
     expand :: Maybe (Expr Src a) -> (Int, [Maybe (Expr Src a)])
-    expand (Just (Record m)) = ((length m), expandRecordFields $ DM.sort m)
-    expand (Just (Union  m)) = ((length m), expandUnionFields $ DM.sort m)
+    expand (Just (Record m)) = (length m, expandRecordFields $ DM.sort m)
+    expand (Just (Union  m)) = (length m, expandUnionFields $ DM.sort m)
     expand _                 = (0, [])
     expandRecordFields :: DM.Map Text (RecordField s a) -> [Maybe (Expr s a)]
     expandRecordFields = map (Just . recordFieldValue) . DM.elems
@@ -110,7 +110,7 @@ addBinding t x = modify (<> (pure $ makeModuleBinding t x))
 findBinding
     :: ExpressionMeta Void -> [ModuleBinding Void] -> Maybe (Expr Src Void)
 findBinding meta =
-    fmap boundVar . listToMaybe . filter (\b -> (rawExp b) == meta)
+    fmap boundVar . find (\b -> rawExp b == meta)
 
 
 
@@ -126,7 +126,7 @@ rewriteExpression e                  = const e
 
 rewriteRecordField
     :: RecordField Src Void -> [ModuleBinding Void] -> RecordField Src Void
-rewriteRecordField r@(RecordField {..}) bs =
+rewriteRecordField r@RecordField {..} bs =
     r { recordFieldValue = rewriteExpression recordFieldValue bs }
 
 
@@ -134,7 +134,7 @@ rewriteBinding
     :: ModuleBinding Void -> [ModuleBinding Void] -> ModuleBinding Void
 rewriteBinding m bs = case asSubstExpr m of
     Record ms -> m
-        { substExp = makeMeta . Record $ fmap (flip rewriteRecordField bs) ms
+        { substExp = makeMeta . Record $ fmap (`rewriteRecordField` bs) ms
         }
     Union ms -> m
         { substExp = makeMeta . Union $ fmap
