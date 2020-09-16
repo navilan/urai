@@ -1,0 +1,19 @@
+session_name: urai
+start_directory: ./
+windows:
+- start_directory: ./
+  window_name: work
+  panes:
+  - shell_command: git status
+- start_directory: ./
+  window_name: repl
+  panes:
+  - shell_command: cabal repl
+- start_directory: ./
+  window_name: ghcid
+  panes:
+  - shell_command: ghcid --lint
+- start_directory: ./
+  window_name: ranger
+  panes:
+  - shell_command: ranger
