@@ -1,4 +1,5 @@
 -- | A Dhall module (File) with multiple let bindings
+{-# LANGUAGE StrictData                 #-}
 
 module Urai.Config.Module
     ( Module
@@ -142,7 +143,7 @@ rewriteBinding m bs = case asSubstExpr m of
                          ms
         }
 
-    _ -> m
+    _otherExpressions -> m
 
 
 evalModule :: Module Text
