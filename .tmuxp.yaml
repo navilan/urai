@@ -1,24 +1,19 @@
-session_name: 'urai'
+session_name: urai
+start_directory: ./
 windows:
-- options:
-    automatic-rename: 'off'
-  panes:
-  - focus: 'true'
-    shell_command: zsh
-  start_directory: ./urai
+- start_directory: ./
   window_name: work
-- options:
-    automatic-rename: 'off'
   panes:
-  - focus: 'true'
-    shell_command: zsh
-  start_directory: ./urai
+  - shell_command: git status
+- start_directory: ./
   window_name: repl
-- focus: 'true'
-  options:
-    automatic-rename: 'off'
   panes:
-  - focus: 'true'
-    shell_command: zsh
-  start_directory: ./urai
+  - shell_command: cabal repl
+- start_directory: ./
   window_name: ghcid
+  panes:
+  - shell_command: ghcid --lint
+- start_directory: ./
+  window_name: ranger
+  panes:
+  - shell_command: ranger
