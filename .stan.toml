@@ -1,0 +1,5 @@
+[[remove]]
+
+[[check]]
+type = "Exclude"
+directory = "test/"
