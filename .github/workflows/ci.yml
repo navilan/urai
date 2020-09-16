@@ -9,9 +9,10 @@ on:
 jobs:
   build:
     name: ghc ${{ matrix.ghc }}
-    runs-on: ubuntu-16.04
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest]
         cabal: ["3.2"]
         ghc:
           - "8.10.1"
@@ -22,6 +23,7 @@ jobs:
 
     - uses: actions/setup-haskell@v1.1.2
       name: Setup Haskell
+      id: setup-haskell-cabal
       with:
         ghc-version: ${{ matrix.ghc }}
         cabal-version: ${{ matrix.cabal }}
