@@ -1,0 +1,24 @@
+session_name: 'urai'
+windows:
+- options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command: zsh
+  start_directory: ./urai
+  window_name: work
+- options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command: zsh
+  start_directory: ./urai
+  window_name: repl
+- focus: 'true'
+  options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command: zsh
+  start_directory: ./urai
+  window_name: ghcid
