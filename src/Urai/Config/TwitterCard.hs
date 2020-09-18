@@ -12,6 +12,7 @@ module Urai.Config.TwitterCard
     , TwitterAppCard(..)
     , TwitterPlayerCard(..)
     , TwitterCard(..)
+    , declareModule
     , printDhall
     )
 where
@@ -139,7 +140,7 @@ instance ToDhall TwitterCard where
     injectWith _ = injectTwitterCard
 
 
-declareModule :: Module()
+declareModule :: Module ()
 declareModule = do
     addBinding "TwitterInfo"        (declared (inject @TwitterInfo))
     addBinding "TwitterSummaryCard" (declared (inject @TwitterSummaryCard))
