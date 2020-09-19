@@ -1,17 +1,17 @@
 -- | A Dhall module (File) with multiple let bindings
-{-# LANGUAGE StrictData                 #-}
+{-# LANGUAGE StrictData #-}
 
 module Urai.Config.Module
-    ( Module
-    , emptyModule
-    , addBinding
-    , evalModule
-    )
+  ( Module
+  , emptyModule
+  , addBinding
+  , addImport
+  , evalModule
+  )
 where
 
 
 import qualified Data.Text                     as T
-import           Data.Text.Prettyprint.Doc      ( Pretty )
 import qualified Data.Tuple.Extra              as TE
 import           Data.Tree                      ( unfoldTree
                                                 , Tree
@@ -19,9 +19,11 @@ import           Data.Tree                      ( unfoldTree
 
 import           Dhall.Core                     ( Binding
                                                 , Expr(..)
+                                                , Import
                                                 , RecordField(..)
                                                 , Var(..)
                                                 , makeBinding
+                                                , makeFieldSelection
                                                 , makeRecordField
                                                 , pretty
                                                 , recordFieldValue
@@ -35,128 +37,193 @@ import qualified Dhall.Map                     as DM
 import           Dhall.Src                      ( Src )
 
 
+import           Unsafe.Coerce                  ( unsafeCoerce )
+
+
 
 
 type RecordExpanse = Tree Int
 
-data ExpressionMeta a = ExpressionMeta
-    { expression :: Expr Src a
-    , expanse    :: RecordExpanse
-    }
+data ExpressionMeta = ExpressionMeta
+  { expression :: Expr Src Void
+  , expanse    :: RecordExpanse
+  }
 
-instance (Eq a, Pretty a, Show a) => Eq (ExpressionMeta a) where
-    exp1 == exp2 =
-        (expanse exp1 == expanse exp2)
-            && same (diffNormalized (expression exp1) (expression exp2))
-
-
-data ModuleBinding a = ModuleBinding
-    { rawExp      :: ExpressionMeta a
-    , substExp    :: ExpressionMeta a
-    , bindingName :: Text
-    }
+instance Eq ExpressionMeta where
+  exp1 == exp2 = (expanse exp1 == expanse exp2)
+    && same (diffNormalized (expression exp1) (expression exp2))
 
 
-asSubstExpr :: ModuleBinding a -> Expr Src a
-asSubstExpr ModuleBinding { substExp = ExpressionMeta {..} } = expression
+data ExpressionBinding = ExpressionBinding
+  { rawExp   :: ExpressionMeta
+  , substExp :: ExpressionMeta
+  , boundVar :: Expr Src Void
+  }
 
 
-boundVar :: ModuleBinding a -> Expr Src a
-boundVar ModuleBinding {..} = Var (V bindingName 0)
+data ImportBinding = ImportBinding
+  { rawImport       :: [ExpressionBinding]
+  , boundImport     :: Import
+  , importQualifier :: Text
+  }
+
+data ModuleBinding
+  = BoundExpression ExpressionBinding
+  | ImportExpression ImportBinding
 
 
-calculateExpanse' :: Maybe (Expr Src a) -> RecordExpanse
+bindingName :: ExpressionBinding -> Text
+bindingName b = case boundVar b of
+  (Var (V name _)) -> name
+  _others          -> "Unknown"
+
+
+justExpression :: ModuleBinding -> Maybe ExpressionBinding
+justExpression (BoundExpression x) = Just x
+justExpression _import             = Nothing
+
+justImport :: ModuleBinding -> Maybe ImportBinding
+justImport (ImportExpression x) = Just x
+justImport _exp                 = Nothing
+
+type ModuleBindings = [ModuleBinding]
+type Module a = StateT ModuleBindings Identity a
+
+
+asSubstExpr :: ExpressionBinding -> Expr Src Void
+asSubstExpr ExpressionBinding { substExp = ExpressionMeta {..} } = expression
+
+
+calculateExpanse' :: Maybe (Expr Src Void) -> RecordExpanse
 calculateExpanse' = unfoldTree expand
-  where
+ where
+  expand :: Maybe (Expr Src a) -> (Int, [Maybe (Expr Src a)])
+  expand (Just (Record m)) = (length m, expandRecordFields $ DM.sort m)
+  expand (Just (Union  m)) = (length m, expandUnionFields $ DM.sort m)
+  expand _                 = (0, [])
+  expandRecordFields :: DM.Map Text (RecordField s a) -> [Maybe (Expr s a)]
+  expandRecordFields = map (Just . recordFieldValue) . DM.elems
+  expandUnionFields :: DM.Map Text (Maybe (Expr s a)) -> [Maybe (Expr s a)]
+  expandUnionFields = DM.elems
 
-    expand :: Maybe (Expr Src a) -> (Int, [Maybe (Expr Src a)])
-    expand (Just (Record m)) = (length m, expandRecordFields $ DM.sort m)
-    expand (Just (Union  m)) = (length m, expandUnionFields $ DM.sort m)
-    expand _                 = (0, [])
-    expandRecordFields :: DM.Map Text (RecordField s a) -> [Maybe (Expr s a)]
-    expandRecordFields = map (Just . recordFieldValue) . DM.elems
-    expandUnionFields :: DM.Map Text (Maybe (Expr s a)) -> [Maybe (Expr s a)]
-    expandUnionFields = DM.elems
 
-
-calculateExpanse :: Expr Src a -> RecordExpanse
+calculateExpanse :: Expr Src Void -> RecordExpanse
 calculateExpanse = calculateExpanse' . Just
 
 
-makeMeta :: Expr Src a -> ExpressionMeta a
+makeMeta :: Expr Src Void -> ExpressionMeta
 makeMeta x = ExpressionMeta { expression = x, expanse = calculateExpanse x }
 
 
-makeModuleBinding :: Text -> Expr Src a -> ModuleBinding a
-makeModuleBinding name e = ModuleBinding { rawExp      = xp
-                                         , substExp    = xp
-                                         , bindingName = name
+makeExpressionBinding :: Text -> Expr Src Void -> ExpressionBinding
+makeExpressionBinding name e = ExpressionBinding { rawExp   = xp
+                                                 , substExp = xp
+                                                 , boundVar = Var (V name 0)
+                                                 }
+  where xp = makeMeta e
+
+
+makeImportBinding :: Import -> Text -> [ModuleBinding] -> ImportBinding
+makeImportBinding p n bs = ImportBinding { rawImport       = expressions bs
+                                         , boundImport     = p
+                                         , importQualifier = n
                                          }
-    where xp = makeMeta e
+ where
+  expressions :: [ModuleBinding] -> [ExpressionBinding]
+  expressions = fmap (makeQualifiedVar n) . mapMaybe justExpression
+  makeQualifiedVar :: Text -> ExpressionBinding -> ExpressionBinding
+  makeQualifiedVar qualifier e@ExpressionBinding {..} = e
+    { boundVar = case boundVar of
+                   (Var (V bName 0)) ->
+                     Field (Var (V qualifier 0)) (makeFieldSelection bName)
+                   x -> x
+    }
 
-fromModuleBinding :: ModuleBinding a -> Binding Src a
-fromModuleBinding ModuleBinding {..} =
-    makeBinding bindingName (expression substExp)
 
-type ModuleBindings = [ModuleBinding Void]
-type Module a = StateT ModuleBindings Identity a
 
 emptyModule :: ModuleBindings
 emptyModule = []
 
 addBinding :: Text -> Expr Src Void -> Module ()
-addBinding t x = modify (<> (pure $ makeModuleBinding t x))
+addBinding t x =
+  modify (<> (pure . BoundExpression $ makeExpressionBinding t x))
+
+addImport :: Import -> Text -> Module () -> Module ()
+addImport p t m = do
+  let bindings = execState m []
+  modify (<> (pure . ImportExpression $ makeImportBinding p t bindings))
 
 
-findBinding
-    :: ExpressionMeta Void -> [ModuleBinding Void] -> Maybe (Expr Src Void)
-findBinding meta =
-    fmap boundVar . find (\b -> rawExp b == meta)
+matchingBinding :: ExpressionMeta -> ModuleBinding -> Maybe (Expr Src Void)
+matchingBinding meta (BoundExpression b) =
+  boundVar <$> guarded ((== meta) . rawExp) b
+matchingBinding meta (ImportExpression b) =
+  findBinding meta (fmap BoundExpression (rawImport b))
 
 
+findBinding :: ExpressionMeta -> [ModuleBinding] -> Maybe (Expr Src Void)
+findBinding meta = find'ish (matchingBinding meta)
+  where find'ish f = getAlt . foldMap' (Alt . f)
 
-findBoundExpression :: Expr Src Void -> [ModuleBinding Void] -> Expr Src Void
+
+findBoundExpression :: Expr Src Void -> [ModuleBinding] -> Expr Src Void
 findBoundExpression e = fromMaybe e . findBinding (makeMeta e)
 
 
-rewriteExpression :: Expr Src Void -> [ModuleBinding Void] -> Expr Src Void
+rewriteExpression :: Expr Src Void -> [ModuleBinding] -> Expr Src Void
 rewriteExpression e@(Record _      ) = findBoundExpression e
+rewriteExpression e@(Union  _      ) = findBoundExpression e
 rewriteExpression (  App List     e) = App List . findBoundExpression e
 rewriteExpression (  App Optional e) = App Optional . findBoundExpression e
 rewriteExpression e                  = const e
 
 rewriteRecordField
-    :: RecordField Src Void -> [ModuleBinding Void] -> RecordField Src Void
+  :: RecordField Src Void -> [ModuleBinding] -> RecordField Src Void
 rewriteRecordField r@RecordField {..} bs =
-    r { recordFieldValue = rewriteExpression recordFieldValue bs }
+  r { recordFieldValue = rewriteExpression recordFieldValue bs }
 
 
-rewriteBinding
-    :: ModuleBinding Void -> [ModuleBinding Void] -> ModuleBinding Void
-rewriteBinding m bs = case asSubstExpr m of
-    Record ms -> m
-        { substExp = makeMeta . Record $ fmap (`rewriteRecordField` bs) ms
-        }
-    Union ms -> m
-        { substExp = makeMeta . Union $ fmap
-                         (fmap $ flip rewriteExpression bs)
-                         ms
-        }
+rewriteBinding :: ModuleBinding -> [ModuleBinding] -> ModuleBinding
+rewriteBinding (BoundExpression m) bs = case asSubstExpr m of
+  Record ms -> BoundExpression m
+    { substExp = makeMeta . Record $ fmap (`rewriteRecordField` bs) ms
+    }
+  Union ms -> BoundExpression m
+    { substExp = makeMeta . Union $ fmap (fmap $ flip rewriteExpression bs) ms
+    }
 
-    _otherExpressions -> m
+  _otherExpressions -> BoundExpression m
+
+rewriteBinding x _ = x
+
+
+
+unsafeReinterpret :: Binding Src Void -> Binding Src Import
+unsafeReinterpret = unsafeCoerce
+
+
+unsafeFromModuleBinding :: ModuleBinding -> Binding Src Import
+unsafeFromModuleBinding (BoundExpression e@ExpressionBinding {..}) =
+  unsafeReinterpret $ makeBinding (bindingName e) (expression substExp)
+unsafeFromModuleBinding (ImportExpression ImportBinding {..}) =
+  makeBinding importQualifier (Embed boundImport)
 
 
 evalModule :: Module Text
 evalModule = do
-    bindings <- get
-    let rewritten = toList $ fmap
-            (fromModuleBinding . flip rewriteBinding bindings)
-            bindings
-    return . pretty $ wrapInLets rewritten (expression rewritten)
-  where
-    expression :: [Binding Src a] -> Expr Src a
-    expression bs = RecordLit . DM.fromList $ map
-        (      variable
-        TE.&&& (makeRecordField . Var . fromString . T.unpack . variable)
-        )
-        bs
+  bindings <- get
+  let exps        = BoundExpression <$> mapMaybe justExpression bindings
+  let imps        = ImportExpression <$> mapMaybe justImport bindings
+  let expressions = rewritten exps bindings
+  let imports     = rewritten imps bindings
+  let inner       = wrapInLets expressions (expression expressions)
+  let outer       = wrapInLets imports inner
+  return $ pretty outer
+ where
+  rewritten :: [ModuleBinding] -> [ModuleBinding] -> [Binding Src Import]
+  rewritten bindings universe =
+    fmap (unsafeFromModuleBinding . flip rewriteBinding universe) bindings
+  expression :: [Binding Src Import] -> Expr Src Import
+  expression bs = RecordLit . DM.fromList $ map
+    (variable TE.&&& (makeRecordField . Var . fromString . T.unpack . variable))
+    bs

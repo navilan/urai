@@ -22,6 +22,7 @@ module Urai.Config.OpenGraph
     , OpenGraphWebsite(..)
     , OpenGraphProfileItem(..)
     , OpenGraph(..)
+    , declareModule
     , printDhall
     )
 where
