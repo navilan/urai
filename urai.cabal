@@ -83,6 +83,7 @@ library
                        text-manipulate    ^>= 0.2.0.1,
                        containers         ^>= 0.6.2.1,
                        ordered-containers ^>= 0.2.2,
+                       base16-bytestring   == 0.1.1.7,
 
 executable urai
   import:              common-options
