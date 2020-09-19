@@ -53,13 +53,13 @@ data Social = Social
 fromPath :: Text -> File
 fromPath p = File
     { directory = Directory . fmap T.pack $ fromMaybe
-                      ([])
+                      []
                       (viaNonEmpty tail comps)
     , file      = T.pack $ fromMaybe "" (viaNonEmpty head comps)
     }
   where
     comps =
-        reverse . filter (\part -> part /= "/") . splitDirectories $ toString p
+        reverse . filter (/= "/") . splitDirectories $ toString p
 
 makeImport :: FilePrefix -> Text -> Import
 makeImport fp p = Import
